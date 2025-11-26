@@ -1,4 +1,5 @@
 # StonePass
+**The only deterministic, offline password generator in pure C++ — no storage, ChaCha20 crypto, MIT-licensed.**
 ### Offline Deterministic Password Generator. No storage. No cloud. No telemetry. No backdoors.
 ### One master password. Every site. Nothing stored --- ever.
 
