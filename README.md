@@ -57,7 +57,25 @@ Same inputs 20 years from now → identical password.
 
 ### Installation
 
-Just download StonePass.cpp, and compile with C++20 enabled.
+StonePass is a single-file C++20 app — no dependencies.
+
+**Compile from source:**
+
+# Download and build
+curl -O https://raw.githubusercontent.com/creosoteshadow/StonePass/main/StonePass.cpp
+c++ -std=c++20 -O2 -march=native StonePass.cpp -o stonepass
+
+# Or with Makefile (add below)
+make stonepass
+
+# With MSVC
+Download StonePass.cpp
+Open Visual Studio
+Create new project named StonePass, console application
+Include StonePass.cpp into the project
+Compile
+
+Then: create passwords!
 
 ### Security Highlights
 
@@ -69,6 +87,19 @@ Fisher–Yates shuffle eliminates policy-induced bias
 Default charset removes ambiguous characters (0/O, 1/l/I, etc.)
 
 Auditable single-file core (~1500 LOC). No external dependencies.
+
+# Contributing to StonePass
+
+StonePass is minimalist by design — bug fixes and security audits welcome.
+
+1. Fork the repo.
+2. Create a feature branch (`git checkout -b feature/awesome-feature`).
+3. Commit changes (`git commit -m 'Add some feature'`).
+4. Push (`git push origin feature/awesome-feature`).
+5. Open a Pull Request.
+
+Tests: Run `c++ -std=c++20 StonePass.cpp && ./stonepass` with your inputs.
+Security: Audit ChaCha impl before merging.
 
 ### License
 
