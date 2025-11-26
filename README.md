@@ -61,21 +61,26 @@ StonePass is a single-file C++20 app — no dependencies.
 
 **Compile from source:**
 
+*Unix/Linux/macOS:*
+
 # Download and build
 curl -O https://raw.githubusercontent.com/creosoteshadow/StonePass/main/StonePass.cpp
 c++ -std=c++20 -O2 -march=native StonePass.cpp -o stonepass
 
-# Or with Makefile (add below)
+# Or with Makefile (included in repo)
 make stonepass
 
-# With MSVC
-Download StonePass.cpp
-Open Visual Studio
-Create new project named StonePass, console application
-Include StonePass.cpp into the project
-Compile
+*Windows (MSVC):*
+
+Download StonePass.cpp.
+Open Visual Studio.
+Create a new Console App project named "StonePass".
+Add StonePass.cpp to the project.
+Build (Ctrl+Shift+B).
 
 Then: create passwords!
+
+Supported compilers: g++ 11+, clang++ 14+, MSVC 2022+.
 
 ### Security Highlights
 
