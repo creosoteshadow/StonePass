@@ -382,38 +382,43 @@ namespace ChaCha {
         static constexpr result_type max() { return UINT64_MAX; }
 
         // -----------------------------------------------------------------
+        // void discard(size_t) :
         // std::uniform_int_distribution / std::discard compatible
         // Skip forward in the RNG sequence, equivalent to n_values calls to operator().
         // -----------------------------------------------------------------
-        void discard(const size_t n) {
-            if (n == 0)return;
-            size_t nwords = n * 2;  // 2 × 32-bit words per u64
+        void discard(size_t n) {
+            if (n == 0) return;
 
-            // Step 1: consume buffered words
-            if (nwords < static_cast<size_t>(buffer_index_)) {
-                buffer_index_ -= static_cast<int>(nwords);
+            size_t words_to_discard = n * 2; //each operator() call uses 2 words
+
+            if (words_to_discard <= values_in_buffer) {
+                values_in_buffer -= words_to_discard;
                 return;
             }
-            nwords -= buffer_index_;
-            buffer_index_ = 0;
-            counter++;
+            else { 
+                // We have more words to discard than remain in buffer. 3 steps:
 
-            // Step 2: skip full blocks
-            const size_t words_per_block = 16; // 16 4-byte words in a block
-            size_t full_blocks = nwords / words_per_block;
-            size_t remainder = nwords % words_per_block;
+                // First, discard all remaining words in the buffer
+                words_to_discard -= values_in_buffer;
+                values_in_buffer = 0;
 
-            // update the block counter
-            if (full_blocks != 0) {
-                counter += full_blocks;
-            }
+                // Second, discard full blocks.
+                size_t nblocks = words_to_discard / 16;
+                size_t remainder = words_to_discard % 16;
 
-            // Step 3: consume remainder by refilling once and discarding
-            if (remainder != 0) {
-                refill_if_needed();                  // generate next block
-                buffer_index_ = static_cast<int>(words_per_block - remainder);
+                block_counter += nblocks;
+                words_to_discard -= nblocks * 16;
+
+                // Third, discard remainder words.
+                for (size_t i = 0; i < remainder; i++) {
+                    // next32() triggers a refill if needed, manages block_counter and values_in_buffer.
+                    // This may look innefficient, but in practice the refill cost is a needed expense,
+                    // and the retrieval of up to 15 words is very fast.  
+                    next32();
+                }
             }
         }
+
 
     private:
         // -----------------------------------------------------------------
