@@ -8,61 +8,128 @@
 
     Goal
     ───────
-    Generate strong, unique, reproducible passwords for every website using only:
-      • A username (or email)
-      • A single strong master password
-      • The site name
-      • A version number (for forced changes)
+        Generate strong, unique, reproducible passwords for every website using only:
+          • A username (or email)
+          • A single strong master password
+          • The site name
+          • A version number (for forced changes)
 
-    No storage. No cloud. No telemetry. No backdoors.
-    You remember one password — StonePass remembers the rest.
+        No storage. No cloud. No telemetry. No backdoors.
+        You remember one password — StonePass remembers the rest.
 
     Security Design Principles
     ──────────────────────────
-    • Fully deterministic — same inputs always produce the same password
-    • Cryptographic-grade primitives only (ChaCha20 stream + custom ChaCha-based hash)
-    • Fixed-cost expensive KDF (1 000 000 iterations) — GPU-resistant, reproducible across decades
-    • Memory-hardened: sensitive data is explicitly zeroed with anti-optimization barriers
-    • High-entropy output with enforced character class policy and Fisher–Yates shuffle
-    • Default character sets exclude ambiguous look-alikes (0/O, 1/l/I, etc.)
-    • 99+ bits of entropy for a 16-character password
+        • Fully deterministic — same inputs always produce the same password
+        • Cryptographic-grade primitives only (ChaCha20 stream + custom ChaCha-based hash)
+        • Fixed-cost expensive KDF (1 000 000 iterations) — GPU-resistant, reproducible across decades
+        • Memory-hardened: sensitive data is explicitly zeroed with anti-optimization barriers
+        • High-entropy output with enforced character class policy and Fisher–Yates shuffle
+        • Default character sets exclude ambiguous look-alikes (0/O, 1/l/I, etc.)
+        • 99+ bits of entropy for a 16-character password
 
     Master Password Guidance
     ────────────────────────
-    IMPORTANT — Your master password is the ONLY secret.
-    StonePass never saves anything — not even a hash.
-    If you forget your master password, every single generated password is lost forever.
-    There is no recovery.
+        IMPORTANT — Your master password is the ONLY secret.
+        StonePass never saves anything — not even a hash.
+        If you forget your master password, every single generated password is lost forever.
+        There is no recovery.
 
-    • Memorize it — this is the gold standard.
-    • Second-best: write it on paper or engrave it on metal and lock it in a safe, safety-deposit box, or with a 
-      trusted person.
-    • Never store it digitally on your phone, computer, cloud notes, or “encrypted” password manager.
-    • Never take a photo or screenshot of it.
-    • Never write it in an email, chat, or text file.
+        • Memorize it — this is the gold standard.
+        • Second-best: write it on paper or engrave it on metal and lock it in a safe, safety-deposit box, or with a 
+          trusted person.
+        • Never store it digitally on your phone, computer, cloud notes, or “encrypted” password manager.
+        • Never take a photo or screenshot of it.
+        • Never write it in an email, chat, or text file.
 
-    A strong master password (or better: a full passphrase) of 20–40 characters is trivial to remember with a 
-    little practice and gives you decades of security even against nation-state attackers.
+        A strong master password (or better: a full passphrase) of 20–40 characters is trivial to remember with a 
+        little practice and gives you decades of security even against nation-state attackers.
 
-    Treat it like the master key to your entire digital life — because that’s exactly what it is.
+        Treat it like the master key to your entire digital life — because that’s exactly what it is.
+
+    Configuration File Support
+    ──────────────────────────
+        StonePass supports optional configuration files to enforce organization-wide
+        password policies without requiring long command lines.
+
+        Search Order (first match wins):
+          1. File specified via --file / -f
+          2. /etc/stonepass.conf
+          3. /usr/local/etc/stonepass.conf
+          4. ~/.stonepassrc                  (user-specific)
+          5. ./stonepass.conf                 (current directory)
+
+        Format: Simple key = value (INI-style), one per line
+        Lines beginning with # or ; are comments
+        Whitespace around keys and values is trimmed
+        Values may be quoted (but quotes are stripped)
+
+        Example: /etc/stonepass/bank-policy.conf
+
+            # Corporate banking policy — very strict
+            uppercase = ABCDEFGHJKLMNPQRSTUVWXYZ
+            lowercase = abcdefghjkmnpqrstuvwxyz
+            digits    = 23456789
+            symbols   = !@#$
+
+            require_uppercase = true
+            require_lowercase = true
+            require_digits    = true
+            require_symbols   = true
+
+            length  = 24
+            version = 1
+
+        Example: ~/.stonepassrc (personal defaults)
+
+            # My personal preferences — allow 0 and 1, but still avoid look-alikes
+            digits = 0123456789
+
+            # Most sites don't need symbols — reduce copy-paste pain
+            symbols = !@#$%
+            require_symbols = false
+
+            length = 20
+
+        Supported Keys
+        ──────────────
+        uppercase           String  Allowed uppercase letters
+        lowercase           String  Allowed lowercase letters
+        digits              String  Allowed digits
+        symbols             String  Allowed symbols (empty string = none)
+
+        require_uppercase   true/false  Enforce at least one uppercase
+        require_lowercase   true/false  Enforce at least one lowercase
+        require_digits      true/false  Enforce at least one digit
+        require_symbols     true/false  Enforce at least one symbol
+
+        length              integer     Default password length (8–128)
+        version             integer     Default version number (>=1)
+
+        Command-line arguments override config file settings.
+        This allows temporary one-off changes without editing the config.
+
+        Pro tip for sysadmins:
+          Deploy /etc/stonepass.conf with restrictive policy
+          Let users override only length/version in ~/.stonepassrc
+          Use --file for per-client or per-project policies
 
     Core Function
     ─────────────
-    std::string generate_password(
-        const std::string& username,
-        const std::string& master_password,
-        const std::string& site_name,
-        int password_length,
-        int password_version = 1,
-        std::string_view uppercase_chars = "ABCDEFGHJKLMNPQRSTUVWXYZ",
-        std::string_view lowercase_chars = "abcdefghijkmnpqrstuvwxyz",
-        std::string_view digit_chars     = "23456789",
-        std::string_view symbol_chars    = "@#$%&*()[]{};:,.?",
-        bool require_uppercase = true,
-        bool require_lowercase = true,
-        bool require_digits     = true,
-        bool require_symbols    = true
-    );
+        std::string generate_password(
+            const std::string& username,
+            const std::string& master_password,
+            const std::string& site_name,
+            int password_length,
+            int password_version = 1,
+            std::string_view uppercase_chars = "ABCDEFGHJKLMNPQRSTUVWXYZ",
+            std::string_view lowercase_chars = "abcdefghijkmnpqrstuvwxyz",
+            std::string_view digit_chars     = "23456789",
+            std::string_view symbol_chars    = "@#$%&*()[]{};:,.?",
+            bool require_uppercase = true,
+            bool require_lowercase = true,
+            bool require_digits     = true,
+            bool require_symbols    = true
+        );
 
     Interactive console version: generate_password_interactive()
     Build with any modern C++20 compiler (g++/clang++/MSVC).
@@ -72,12 +139,16 @@
 #include <atomic>
 #include <conio.h>
 #include <cstdint>
+#include <cstdlib>
 #include <iostream>
+#include <fstream>
 #include <limits>
+#include <optional>
 #include <string>
 #include <string_view>
 #include <stdexcept>
 #include <vector>
+
 
  // ====================================================================
  // Portable rotl / rotr — works on GCC, Clang, MSVC, even ancient ones
@@ -382,43 +453,38 @@ namespace ChaCha {
         static constexpr result_type max() { return UINT64_MAX; }
 
         // -----------------------------------------------------------------
-        // void discard(size_t) :
         // std::uniform_int_distribution / std::discard compatible
         // Skip forward in the RNG sequence, equivalent to n_values calls to operator().
         // -----------------------------------------------------------------
-        void discard(size_t n) {
-            if (n == 0) return;
+        void discard(const size_t n) {
+            if (n == 0)return;
+            size_t nwords = n * 2;  // 2 × 32-bit words per u64
 
-            size_t words_to_discard = n * 2; //each operator() call uses 2 words
-
-            if (words_to_discard <= values_in_buffer) {
-                values_in_buffer -= words_to_discard;
+            // Step 1: consume buffered words
+            if (nwords < static_cast<size_t>(buffer_index_)) {
+                buffer_index_ -= static_cast<int>(nwords);
                 return;
             }
-            else { 
-                // We have more words to discard than remain in buffer. 3 steps:
+            nwords -= buffer_index_;
+            buffer_index_ = 0;
+            counter++;
 
-                // First, discard all remaining words in the buffer
-                words_to_discard -= values_in_buffer;
-                values_in_buffer = 0;
+            // Step 2: skip full blocks
+            const size_t words_per_block = 16; // 16 4-byte words in a block
+            size_t full_blocks = nwords / words_per_block;
+            size_t remainder = nwords % words_per_block;
 
-                // Second, discard full blocks.
-                size_t nblocks = words_to_discard / 16;
-                size_t remainder = words_to_discard % 16;
+            // update the block counter
+            if (full_blocks != 0) {
+                counter += full_blocks;
+            }
 
-                block_counter += nblocks;
-                words_to_discard -= nblocks * 16;
-
-                // Third, discard remainder words.
-                for (size_t i = 0; i < remainder; i++) {
-                    // next32() triggers a refill if needed, manages block_counter and values_in_buffer.
-                    // This may look innefficient, but in practice the refill cost is a needed expense,
-                    // and the retrieval of up to 15 words is very fast.  
-                    next32();
-                }
+            // Step 3: consume remainder by refilling once and discarding
+            if (remainder != 0) {
+                refill_if_needed();                  // generate next block
+                buffer_index_ = static_cast<int>(words_per_block - remainder);
             }
         }
-
 
     private:
         // -----------------------------------------------------------------
@@ -1080,11 +1146,345 @@ void test_generate_password() {
     std::cout << "password_v = " << password_v << "\n";
 }
 
-int main() {
-#if(0)
-    test_generate_password();
-#else
-    generate_password_interactive();
-#endif
+
+
+struct PasswordInputData {
+    bool use_interactive_mode = false;
+
+    // Owned strings (we need to store them)
+    std::string username;
+    std::string master_password;
+    std::string site_name;
+
+    int password_length = 16;
+    int password_version = 1;
+
+    // Character sets as string_view (pointing into string literals or custom input)
+    // Note: no look-alikes by default
+    std::string_view uppercase_chars = "ABCDEFGHJKLMNPQRSTUVWXYZ"; // no I, O
+    std::string_view lowercase_chars = "abcdefghijkmnpqrstuvwxyz"; // no l, 0
+    std::string_view digit_chars = "23456789"; // no 1, 0
+    std::string_view symbol_chars = "@#$%&*()[]{};:,.?";
+
+    // Requirements
+    bool require_uppercase = true;
+    bool require_lowercase = true;
+    bool require_digits = true;
+    bool require_symbols = true;
+};
+
+// Helper to create default instance
+PasswordInputData make_default_input_data() {
+    return PasswordInputData{};
+}
+
+void load_config_file(const std::string& path, PasswordInputData& data) {
+    std::ifstream file(path);
+    if (!file.is_open()) return; // silently skip if missing
+
+    std::cout << "Loaded config: " << path << "\n";
+
+    std::string line;
+    int line_num = 0;
+    while (std::getline(file, line)) {
+        ++line_num;
+
+        // Skip comments and empty lines
+        if (line.empty() || line[0] == '#' || line[0] == ';') continue;
+
+        // Trim whitespace
+        line.erase(0, line.find_first_not_of(" \t"));
+        line.erase(line.find_last_not_of(" \t") + 1);
+
+        auto eq_pos = line.find('=');
+        if (eq_pos == std::string::npos) continue; // invalid line
+
+        std::string key = line.substr(0, eq_pos);
+        std::string value = line.substr(eq_pos + 1);
+
+        // Trim key and value
+        key.erase(0, key.find_first_not_of(" \t"));
+        key.erase(key.find_last_not_of(" \t") + 1);
+        value.erase(0, value.find_first_not_of(" \t\"'"));  // allow quotes
+        value.erase(value.find_last_not_of(" \t\"'") + 1);
+
+        // Now apply the setting
+        if (key == "uppercase")          data.uppercase_chars = value;
+        else if (key == "lowercase")     data.lowercase_chars = value;
+        else if (key == "digits")        data.digit_chars = value;
+        else if (key == "symbols")       data.symbol_chars = value;
+        else if (key == "length")        data.password_length = std::stoi(value);
+        else if (key == "version")       data.password_version = std::stoi(value);
+        else if (key == "require_uppercase")  data.require_uppercase = (value == "true" || value == "1");
+        else if (key == "require_lowercase")  data.require_lowercase = (value == "true" || value == "1");
+        else if (key == "require_digits")     data.require_digits = (value == "true" || value == "1");
+        else if (key == "require_symbols")    data.require_symbols = (value == "true" || value == "1");
+        else {
+            std::cerr << "Warning: Unknown key in " << path
+                << ":" << line_num << " -> " << key << "\n";
+        }
+    }
+}
+
+PasswordInputData parse_args(int argc, char const* argv[]) {
+    PasswordInputData data = make_default_input_data();
+
+    /*
+    # Option 1: Double quotes (most common)
+    StonePass --username "John Doe" --master-password "Tree dog horse mountain" --site-name github.com
+
+    # Option 2: Single quotes (also fine)
+    StonePass --username 'John Doe' --master-password 'Tree dog horse mountain' --site-name github.com
+
+    */
+
+    if (argc == 1) {
+        data.use_interactive_mode = true;
+        return data;
+    }
+
+    // Auto-load config (before CLI args, so CLI overrides win)
+    std::vector<std::string> auto_paths = {
+        "/etc/stonepass.conf",
+        "/usr/local/etc/stonepass.conf",
+        getenv("HOME") ? std::string(getenv("HOME")) + "/.stonepassrc" : "",
+        "./stonepass.conf"
+    };
+
+    for (const auto& path : auto_paths) {
+        if (!path.empty()) {
+            load_config_file(path, data);
+        }
+    }
+
+    for (int i = 1; i < argc; ++i) {
+        std::string arg = argv[i];
+
+        if (arg == "--username" || arg == "-u") {
+            if (i + 1 >= argc) {
+                std::cerr << "Error: " << arg << " requires an argument\n";
+                std::exit(1);
+            }
+            data.username = argv[++i];
+        }
+        else if (arg == "--master-password" || arg == "-p") {
+            if (i + 1 >= argc) {
+                std::cerr << "Error: " << arg << " requires an argument\n";
+                std::exit(1);
+            }
+            data.master_password = argv[++i];
+        }
+        else if (arg == "--file" || arg == "-f") {
+            if (i + 1 >= argc) {
+                std::cerr << "Error: " << arg << " requires a config file path\n";
+                std::exit(1);
+            }
+            const std::string config_path = argv[++i];
+
+            std::ifstream file(config_path);
+            if (!file.is_open()) {
+                std::cerr << "Error: Cannot open config file: " << config_path << "\n";
+                std::exit(1);
+            }
+
+            std::string line;
+            int line_num = 0;
+            while (std::getline(file, line)) {
+                ++line_num;
+
+                // Skip comments and empty lines
+                if (line.empty() || line[0] == '#' || line[0] == ';') continue;
+
+                // Trim whitespace
+                line.erase(0, line.find_first_not_of(" \t"));
+                line.erase(line.find_last_not_of(" \t") + 1);
+
+                auto eq_pos = line.find('=');
+                if (eq_pos == std::string::npos) continue; // invalid line
+
+                std::string key = line.substr(0, eq_pos);
+                std::string value = line.substr(eq_pos + 1);
+
+                // Trim key and value
+                key.erase(0, key.find_first_not_of(" \t"));
+                key.erase(key.find_last_not_of(" \t") + 1);
+                value.erase(0, value.find_first_not_of(" \t\"'"));  // allow quotes
+                value.erase(value.find_last_not_of(" \t\"'") + 1);
+
+                // Now apply the setting
+                if (key == "uppercase")          data.uppercase_chars = value;
+                else if (key == "lowercase")     data.lowercase_chars = value;
+                else if (key == "digits")        data.digit_chars = value;
+                else if (key == "symbols")       data.symbol_chars = value;
+                else if (key == "length")        data.password_length = std::stoi(value);
+                else if (key == "version")       data.password_version = std::stoi(value);
+                else if (key == "require_uppercase")  data.require_uppercase = (value == "true" || value == "1");
+                else if (key == "require_lowercase")  data.require_lowercase = (value == "true" || value == "1");
+                else if (key == "require_digits")     data.require_digits = (value == "true" || value == "1");
+                else if (key == "require_symbols")    data.require_symbols = (value == "true" || value == "1");
+                else {
+                    std::cerr << "Warning: Unknown key in " << config_path
+                        << ":" << line_num << " -> " << key << "\n";
+                }
+            }
+        }
+        else if (arg == "--site-name" || arg == "-s") {
+            if (i + 1 >= argc) {
+                std::cerr << "Error: " << arg << " requires an argument\n";
+                std::exit(1);
+            }
+            data.site_name = argv[++i];
+        }
+        else if (arg == "--length" || arg == "-l") {
+            if (i + 1 >= argc) {
+                std::cerr << "Error: " << arg << " requires an argument\n";
+                std::exit(1);
+            }
+            data.password_length = std::stoi(argv[++i]);
+        }
+        else if (arg == "--version" || arg == "-v") {
+            if (i + 1 >= argc) {
+                std::cerr << "Error: " << arg << " requires an argument\n";
+                std::exit(1);
+            }
+            data.password_version = std::stoi(argv[++i]);
+        }
+        else if (arg == "--no-uppercase"|| arg == "--nu") {
+            data.require_uppercase = false;
+        }
+        else if (arg == "--no-lowercase"|| arg == "--nl") {
+            data.require_lowercase = false;
+        }
+        else if (arg == "--no-digits"|| arg == "--nd") {
+            data.require_digits = false;
+        }
+        else if (arg == "--no-symbols"|| arg == "--ns") {
+            data.require_symbols = false;
+        }
+        else if (arg == "--uppercase" || arg == "--uc") {
+            if (i + 1 >= argc) { 
+                std::cerr << "Error: " << arg << " requires an argument: list of acceptable uppercase characters.\n";
+                std::exit(1);
+            }
+            data.uppercase_chars = argv[++i];
+        }
+        else if (arg == "--lowercase" || arg == "--lc") {
+            if (i + 1 >= argc) {
+                std::cerr << "Error: " << arg << " requires an argument: list of acceptable lowercase characters.\n";
+                std::exit(1);
+            }
+            data.lowercase_chars = argv[++i];
+        }
+        else if (arg == "--digits" || arg == "--d") {
+            if (i + 1 >= argc) {
+                std::cerr << "Error: " << arg << " requires an argument: list of acceptable digits.\n";
+                std::exit(1);
+            }
+            data.digit_chars = argv[++i];
+        }
+        else if (arg == "--symbols" || arg == "--sym") {
+            if (i + 1 >= argc) {
+                std::cerr << "Error: " << arg << " requires an argument: list of acceptable symbols.\n";
+                std::exit(1);
+            }
+            data.symbol_chars = argv[++i];
+        }
+        else if (arg == "--help" || arg == "-h") {
+            std::cout << R"(Usage: pwgen [options]
+                Options:
+                  --username <name>          Your username/email
+                  --master-password <pw>     Master password (use carefully!)
+                  --site-name <site>         Website/domain name
+                  --length <n>               Password length (default: 16)
+                  --version <n>              Password version (default: 1)
+                  --no-uppercase             Don't require uppercase letters
+                  --no-lowercase             Don't require lowercase letters
+                  --no-digits                Don't require digits
+                  --no-symbols               Don't require symbols
+                  --uppercase <chars>        Custom uppercase letters (e.g. "ABCDEFGHJKLMNPQRSTUVWXYZ")
+                  --lowercase <chars>        Custom lowercase letters
+                  --digits <chars>           Custom digits (e.g. "0123456789" to allow 0 and 1)
+                  --symbols <chars>          Custom symbols (e.g. "+-_=" or "")
+                  --help                     Show this help
+
+                If no arguments are given, interactive mode starts.
+                )";
+            std::exit(0);
+        }
+        else {
+            std::cerr << "Unknown or incomplete argument: " << arg << "\n";
+            std::cerr << "Use --help for usage information.\n";
+            std::exit(1);
+        }
+    }
+
+    // Basic validation
+    if (!data.use_interactive_mode) {
+        if (data.username.empty()) {
+            std::cerr << "Error: --username is required in non-interactive mode\n";
+            std::exit(1);
+        }
+        if (data.master_password.empty()) {
+            std::cerr << "Error: --master-password is required in non-interactive mode\n";
+            std::exit(1);
+        }
+        if (data.site_name.empty()) {
+            std::cerr << "Error: --site-name is required in non-interactive mode\n";
+            std::exit(1);
+        }
+    }
+
+    return data;
+}
+
+
+
+int main(int argc, char const* argv[]) {
+    PasswordInputData CL = parse_args(argc, argv);
+    if(CL.use_interactive_mode)
+        generate_password_interactive();
+    else {
+        try {
+            std::string password = generate_password(
+                CL.username,
+                CL.master_password,
+                CL.site_name,
+                CL.password_length,
+                CL.password_version,
+
+                // === Character Sets ===
+                CL.uppercase_chars,
+                CL.lowercase_chars,
+                CL.digit_chars,
+                CL.symbol_chars,
+
+                // === Policy Flags ===
+                CL.require_uppercase,
+                CL.require_lowercase,
+                CL.require_digits,
+                CL.require_symbols
+            );
+
+            std::cout << "Your password is:\n\n";
+            std::cout << "    " << password << "\n\n";
+            std::cout << "Copy it now - it will be cleared from screen in a moment.\n";
+            std::cout << "\nPress Enter to clear screen and exit...";
+            std::cout.flush();
+
+            std::cin.get();  // wait
+
+            // Final wipe
+            Utilities::cls();
+        }
+        catch (const std::exception& e) {
+            std::cerr << "Error: " << e.what() << '\n';
+            std::cin.get();
+        }
+        // Securely wipe master password from memory
+        Utilities::secure_zero(
+            const_cast<void*>(static_cast<const void*>(CL.master_password.data())),
+            CL.master_password.size()
+        );
+    }
     return 0;
 }
