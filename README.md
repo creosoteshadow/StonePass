@@ -94,6 +94,29 @@ Default charset removes ambiguous characters (0/O, 1/l/I, etc.)
 
 Auditable single-file core (~1500 LOC). No external dependencies.
 
+## Compiling
+
+Linux (x86_64) — GCC 14.2 & Clang 18
+Bash# GCC 14.2
+g++ -std=c++20 -O2 -Wall -Wextra -pedantic -march=native -o stonepass stonepass.cpp
+
+Clang 18
+clang++ -std=c++20 -O2 -Wall -Wextra -pedantic -march=native -o stonepass stonepass.cpp
+
+macOS (Apple Silicon M2) — Clang 16 (Apple)
+Bashclang++ -std=c++20 -O2 -Wall -Wextra -pedantic -o stonepass stonepass.cpp
+
+Windows — MinGW-w64 (GCC 13.2) via MSYS2
+Bashg++ -std=c++20 -O2 -static -o stonepass.exe stonepass.cpp
+
+Windows — MSVC
+Insert the source code into a new c++ console project
+Compile
+Generate Passwords!
+
+Cross-compilation test: Linux → Windows (x86_64-w64-mingw32)
+Bashx86_64-w64-mingw32-g++ -std=c++20 -O2 -static -o stonepass.exe stonepass.cpp
+
 # Contributing to StonePass
 
 StonePass is minimalist by design — bug fixes and security audits welcome.
