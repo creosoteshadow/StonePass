@@ -35,13 +35,13 @@
         There is no recovery.
 
         • Memorize it — this is the gold standard.
-        • Second-best: write it on paper or engrave it on metal and lock it in a safe, safety-deposit box, or with a 
+        • Second-best: write it on paper or engrave it on metal and lock it in a safe, safety-deposit box, or with a
           trusted person.
         • Never store it digitally on your phone, computer, cloud notes, or “encrypted” password manager.
         • Never take a photo or screenshot of it.
         • Never write it in an email, chat, or text file.
 
-        A strong master password (or better: a full passphrase) of 20–40 characters is trivial to remember with a 
+        A strong master password (or better: a full passphrase) of 20–40 characters is trivial to remember with a
         little practice and gives you decades of security even against nation-state attackers.
 
         Treat it like the master key to your entire digital life — because that’s exactly what it is.
@@ -141,6 +141,7 @@
 #include <cstdint>
 #include <cstdlib>
 #include <iostream>
+#include <format>  // For std::format
 #include <fstream>
 #include <limits>
 #include <optional>
@@ -150,39 +151,51 @@
 #include <vector>
 
 
- // ====================================================================
- // Portable rotl / rotr — works on GCC, Clang, MSVC, even ancient ones
- // ====================================================================
+#if __cplusplus >= 202002L
+    #include <format>
+    #define HAS_STD_FORMAT 1
+#else
+    #define HAS_STD_FORMAT 0
+
+    // Fallback context string
+    inline std::string make_context_fallback(int v, const std::string& u, const std::string& s, int l) {
+        return "ChaChaPassword/v" + std::to_string(v) + "/" + u + "/" + s + "/len" + std::to_string(l);
+    }
+#endif
+
+// ====================================================================
+// Portable rotl / rotr — works on GCC, Clang, MSVC, even ancient ones
+// ====================================================================
 #if defined(__has_include) && __has_include(<bit>)
     // Best option: <bit> header from C++20
-    #include <bit>
-    using std::rotl;
-    using std::rotr;
+#include <bit>
+using std::rotl;
+using std::rotr;
 #elif defined(_MSC_VER) && (_MSC_VER >= 1920) && (_MSVC_LANG >= 202002L)
     // MSVC 2019 16.8+ with /std:c++20 or later has <bit>
-    #include <bit>
-    using std::rotl;
-    using std::rotr;
+#include <bit>
+using std::rotl;
+using std::rotr;
 #elif defined(__GNUC__) || defined(__clang__)
     // GCC/Clang builtin — works since forever
-    inline constexpr uint32_t rotl(uint32_t x, int n) noexcept { return (x << n) | (x >> (32 - n)); }
-    inline constexpr uint32_t rotr(uint32_t x, int n) noexcept { return (x >> n) | (x << (32 - n)); }
-    inline constexpr uint64_t rotl(uint64_t x, int n) noexcept { return (x << n) | (x >> (64 - n)); }
-    inline constexpr uint64_t rotr(uint64_t x, int n) noexcept { return (x >> n) | (x << (64 - n)); }
+inline constexpr uint32_t rotl(uint32_t x, int n) noexcept { return (x << n) | (x >> (32 - n)); }
+inline constexpr uint32_t rotr(uint32_t x, int n) noexcept { return (x >> n) | (x << (32 - n)); }
+inline constexpr uint64_t rotl(uint64_t x, int n) noexcept { return (x << n) | (x >> (64 - n)); }
+inline constexpr uint64_t rotr(uint64_t x, int n) noexcept { return (x >> n) | (x << (64 - n)); }
 #else
     // Pure portable fallback — works on literally everything
-    inline constexpr uint32_t rotl(uint32_t x, int n) noexcept {
-        return (x << (n & 31)) | (x >> ((32 - (n & 31)) & 31));
-    }
-    inline constexpr uint32_t rotr(uint32_t x, int n) noexcept {
-        return (x >> (n & 31)) | (x << ((32 - (n & 31)) & 31));
-    }
-    inline constexpr uint64_t rotl(uint64_t x, int n) noexcept {
-        return (x << (n & 63)) | (x >> ((64 - (n & 63)) & 63));
-    }
-    inline constexpr uint64_t rotr(uint64_t x, int n) noexcept {
-        return (x >> (n & 63)) | (x << ((64 - (n & 63)) & 63));
-    }
+inline constexpr uint32_t rotl(uint32_t x, int n) noexcept {
+    return (x << (n & 31)) | (x >> ((32 - (n & 31)) & 31));
+}
+inline constexpr uint32_t rotr(uint32_t x, int n) noexcept {
+    return (x >> (n & 31)) | (x << ((32 - (n & 31)) & 31));
+}
+inline constexpr uint64_t rotl(uint64_t x, int n) noexcept {
+    return (x << (n & 63)) | (x >> ((64 - (n & 63)) & 63));
+}
+inline constexpr uint64_t rotr(uint64_t x, int n) noexcept {
+    return (x >> (n & 63)) | (x << ((64 - (n & 63)) & 63));
+}
 #endif
 
 // alias types for fixed-size unsigned integers
@@ -392,7 +405,16 @@ namespace ChaCha {
         return state;
     }
 
-    // Random Number Generator based on ChaCha20 keystream
+
+    // Deterministic, cryptographically secure random number generator
+    // based on the ChaCha20 stream cipher (RFC 8439) in counter mode.
+    //
+    // Features:
+    // • Full 256-bit key + 128-bit counter space (no practical repeat risk)
+    // • Constant-time operations
+    // • Efficient discard() for std::shuffle / distribution compatibility
+    // • Unbiased range mapping (rejection sampling)
+    // • Password → RNG constructor with optional deliberate slowdown
     class RNG {
     public:
         using u64 = uint64_t;
@@ -403,45 +425,71 @@ namespace ChaCha {
         using result_type = uint64_t;
 
         // -----------------------------------------------------------------
-        // Public interface
+        // Cryptographic seeding (recommended for production)
         // -----------------------------------------------------------------
-        // Strong, deterministic seeding (cryptographic)
         explicit RNG(const KEY& _key, const NONCE& _nonce = NONCE{})
             : key(_key), nonce(_nonce), buffer{}, counter(0), buffer_index_(0)
         {
-            refill_if_needed();  // first block is generated immediately
+            refill_if_needed(); // Generate first block immediately
         }
 
+        RNG(const std::pair<const KEY, const NONCE>& arg) 
+            : key(arg.first), nonce(arg.second), buffer{}, counter(0), buffer_index_(0)
+        {
+            refill_if_needed(); // Generate first block immediately
+        }
 
         // -----------------------------------------------------------------
-        // Copy Constructor (Enables State Saving)
+        // Human-friendly seeding from a password and context string
+        //
+        // This constructor is deliberately deterministic and reproducible.
+        // The optional delay_iterations parameter adds computational work
+        // to slow down brute-force attacks against the password.
+        //
+        // Example timings on a modern CPU (≈ 3–4 GHz):
+        //   delay_iterations =       0 → instant
+        //   delay_iterations =  500000 → ~0.25 seconds
+        //   delay_iterations = 1000000 → ~0.5 seconds
+        //   delay_iterations = 2000000 → ~1.0 seconds
         // -----------------------------------------------------------------
-        RNG(const RNG& other) = default;
+        RNG(const std::string& password,
+            const std::string& context = "",
+            size_t delay_iterations = 0)
+            : RNG(make_key_and_nonce(password, context, delay_iterations))
+        {
+            // Body intentionally empty — all work done in initializer list
+        }
+
+        // Copyable — essential feature
+        RNG(const RNG&) = default;
+
+        // Not assignable — prevents corruption of buffer/counter state
+        RNG& operator=(const RNG&) = delete;
+        RNG(RNG&&) = delete;
+        RNG& operator=(RNG&&) = delete;
 
         // -----------------------------------------------------------------
-        // Uniform random integer in [min(), max()]
+        // Generate next 64-bit value
         // -----------------------------------------------------------------
         result_type operator()()
         {
-            // ChaCha20 produces 64 bytes per block → two 32-bit words → one u64
             const u32 lo = next32();
             const u32 hi = next32();
             return (static_cast<u64>(hi) << 32) | lo;
         }
 
         // -----------------------------------------------------------------
-        // Uniform random integer in [lo, hi]
+        // Uniform integer in [lo, hi] (inclusive) with perfect unbiased mapping
         // -----------------------------------------------------------------
-        std::uint64_t unbiased(std::uint64_t lo, std::uint64_t hi) // inclusive
+        uint64_t unbiased(uint64_t lo, uint64_t hi)
         {
             if (lo > hi) std::swap(lo, hi);
             if (lo == hi) return lo;
 
-            const std::uint64_t range = hi - lo + 1;
-            const std::uint64_t limit = std::numeric_limits<std::uint64_t>::max() -
-                (std::numeric_limits<std::uint64_t>::max() % range);
+            const uint64_t range = hi - lo + 1;
+            const uint64_t limit = -range % range; // Equivalent to UINT64_MAX - (UINT64_MAX % range)
 
-            std::uint64_t value;
+            uint64_t value;
             do {
                 value = (*this)();
             } while (value > limit);
@@ -453,35 +501,33 @@ namespace ChaCha {
         static constexpr result_type max() { return UINT64_MAX; }
 
         // -----------------------------------------------------------------
-        // std::uniform_int_distribution / std::discard compatible
-        // Skip forward in the RNG sequence, equivalent to n_values calls to operator().
+        // Fast-forward the stream — required for compatibility with std::shuffle, etc.
         // -----------------------------------------------------------------
-        void discard(const size_t n) {
-            if (n == 0)return;
-            size_t nwords = n * 2;  // 2 × 32-bit words per u64
+        void discard(size_t n)
+        {
+            if (n == 0) return;
 
-            // Step 1: consume buffered words
-            if (nwords < static_cast<size_t>(buffer_index_)) {
-                buffer_index_ -= static_cast<int>(nwords);
+            size_t words_to_discard = n * 2; // 2 × 32-bit words per u64
+
+            // Consume buffered words first
+            if (words_to_discard < static_cast<size_t>(buffer_index_)) {
+                buffer_index_ -= static_cast<int>(words_to_discard);
                 return;
             }
-            nwords -= buffer_index_;
+
+            words_to_discard -= buffer_index_;
             buffer_index_ = 0;
             counter++;
 
-            // Step 2: skip full blocks
-            const size_t words_per_block = 16; // 16 4-byte words in a block
-            size_t full_blocks = nwords / words_per_block;
-            size_t remainder = nwords % words_per_block;
+            constexpr size_t words_per_block = 16;
+            size_t full_blocks = words_to_discard / words_per_block;
+            size_t remainder = words_to_discard % words_per_block;
 
-            // update the block counter
-            if (full_blocks != 0) {
+            if (full_blocks != 0)
                 counter += full_blocks;
-            }
 
-            // Step 3: consume remainder by refilling once and discarding
             if (remainder != 0) {
-                refill_if_needed();                  // generate next block
+                refill_if_needed();
                 buffer_index_ = static_cast<int>(words_per_block - remainder);
             }
         }
@@ -493,57 +539,79 @@ namespace ChaCha {
         KEY     key;
         NONCE   nonce;
         BLOCK64 buffer;
-        u64     counter;
-        int     buffer_index_;   // 0 → buffer empty, 1-16 → valid words left
+        u64     counter = 0;
+        int     buffer_index_ = 0; // Number of remaining valid 32-bit words in buffer (0–16)
 
-        // -----------------------------------------------------------------
-        // Helper predicates
-        // -----------------------------------------------------------------
-        [[nodiscard]] bool buffer_empty() const noexcept { return buffer_index_ == 0; }
+    private:
+        // Helper: returns key/nonce pair from password+context
+        static std::pair<KEY, NONCE> make_key_and_nonce(
+            const std::string& password,
+            const std::string& context,
+            size_t delay_iterations)
+        {
+            ChaCha::SecureHash hasher1({});
+            hasher1.update("derive_key_material.salt.v001");
+            hasher1.update(password);
+            auto seed = hasher1.hash256();
 
+            ChaCha::SecureHash hasher2(seed);
+            hasher2.update("rng-key-derivation-v1");
+            hasher2.update(context);
+            hasher2.update(password);
+
+            auto material = hasher2.hash512();
+
+            for (size_t i = 0; i < delay_iterations; ++i) {
+                hasher2.update(material);
+                material = hasher2.hash512();
+            }
+
+            KEY   key{};
+            NONCE nonce{};
+
+            std::memcpy(key.data(), material.data(), 32);
+            std::memcpy(nonce.data(), material.data() + 4, 8);  // +4 × uint64_t = 32 bytes
+
+            return { key, nonce };
+        }
 
         // -----------------------------------------------------------------
         // Buffer management
         // -----------------------------------------------------------------
+        [[nodiscard]] bool buffer_empty() const noexcept { return buffer_index_ == 0; }
+
         void refill_if_needed() noexcept
         {
             if (!buffer_empty()) return;
 
-            // ----- build the input block (same layout as RFC 8439) -----
-            u64 block_counter = counter;
-            BLOCK64 state = build_state(key, nonce, block_counter);
+            BLOCK64 state = build_state(key, nonce, counter);
+            chacha20_permute_block(buffer, state);
 
-            chacha20_permute_block(buffer, state);     // serialize output into buffer_
-            increment_counter();                // Prep the counter for the next buffer refill
-            buffer_index_ = 16;                 // 16 valid 32-bit words
+            ++counter;
+            buffer_index_ = 16;
         }
 
         u32 next32() noexcept
         {
             refill_if_needed();
             --buffer_index_;
-            return buffer[15 - buffer_index_];   // return the *oldest* word first
-        }
-
-        void increment_counter() noexcept
-        {
-            ++counter;
+            return buffer[15 - buffer_index_]; // Oldest word first (little-endian friendly)
         }
 
         // -----------------------------------------------------------------
-        // Helper: reset counter + clear buffer
+        // Reset to initial state (counter = 0, buffer invalidated)
         // -----------------------------------------------------------------
         void reset_state() noexcept
         {
             counter = 0;
             buffer_index_ = 0;
-            refill_if_needed();   // generate first block
+            refill_if_needed();
         }
     };
 
     // Hash function based on ChaCha20 permutation
     class SecureHash {
-        private:
+    private:
 
         // Helper class - BlockHash hashes only full blocks
         class BlockHash {
@@ -813,7 +881,7 @@ inline std::string generate_password(
     bool require_lowercase = true,
     bool require_digits = true,
     bool require_symbols = true
-) 
+)
 {
     // forward declaration of helper function
     //inline std::array<uint64_t, 8> derive_rng_seed_material(
@@ -853,56 +921,17 @@ inline std::string generate_password(
         throw std::invalid_argument("password_length too short for required categories");
     }
 
+    // === Create random number generator ===
+    #if HAS_STD_FORMAT
+        const std::string context = std::format("ChaChaPassword/v{}/{}/{}/len{}",
+            password_version, username, site_name, password_length);
+    #else
+        const std::string context = make_context_fallback(password_version, username, site_name, password_length);
+    #endif
+    
+    ChaCha::RNG rng(master_password, context, 1'000'000);
 
-    // === Step 1: Derive Key & Nonce for the step 2 hasher (Iterative KDF) ===
-    ChaCha::SecureHash hasher({}); // unkeyed is fine here
-    hasher.update("derive_key_material.salt.v001");  // versioned domain salt
-    hasher.update(username);
-    hasher.update(master_password);
-    std::array<uint64_t, 4> key_material = hasher.hash256();
-
-    // === Step 2: Second Hash ( we use 2 for domain separation + avalanche) ===
-    // This hasher will be used to fill a key and nonce for the random number generator.
-    ChaCha::SecureHash hasher2(key_material);
-    hasher2.update("random-number-generator-key-derivation-salt-v1");
-    hasher2.update(username);
-    hasher2.update(master_password);
-    hasher2.update(site_name);
-    hasher2.update(password_length);
-    hasher2.update(password_version);
-
-    std::array<uint64_t, 8> rng_material
-        = hasher2.hash512();
-
-    // Iteratively rehash the hash result to burn some time. We don't want a fast hash.
-    int nits = 1'000'000;  // ~150–500 ms depending on hardware (2020–2035 era)
-    // This is deliberately fixed — never calibrate. 
-    // Reproducibility across machines and decades is the entire point of a deterministic generator.
-    // 1 000 000 iterations gives >10⁶× slowdown vs raw SHA-512 → GPU cracking cost becomes astronomical
-    // while still feeling instantaneous to a human.
-    for (int it = 0; it < nits; ++it) {
-        hasher2.update(rng_material);
-        rng_material = hasher2.hash512();
-    }
-
-    // === Step 3: Extract RNG Seed Material from Final Hash ===
-    // Now we need a key and nonce to use in the random number generator.
-    // We will fill them with the bytes in final_hash.
-    constexpr size_t KEY_SIZE = sizeof(ChaCha::KEY); // 32 bytes, 256 bits
-    constexpr size_t NONCE_SIZE = sizeof(ChaCha::NONCE); // 12 bytes, 96 bits
-    ChaCha::KEY rng_key{};
-    ChaCha::NONCE rng_nonce{};
-    // This shouldn't fail. Expected sizes: KEY_SIZE=32, NONCE_SIZE=12, sizeof(final_hash)=64 
-    if (KEY_SIZE + NONCE_SIZE > rng_material.size() * sizeof(uint64_t))
-        throw std::runtime_error("Final hash too small for RNG seed");
-    const uint8_t* bytes = reinterpret_cast<const uint8_t*>(rng_material.data());
-    std::memcpy(rng_key.data(), bytes, KEY_SIZE);
-    std::memcpy(rng_nonce.data(), bytes + KEY_SIZE, NONCE_SIZE);
-
-    // === Step 4: Initialize Deterministic RNG ===
-    ChaCha::RNG rng(rng_key, rng_nonce); // RNG is a ChaCha20 keystream-based rng.
-
-    // === Step 5: Define Character Pools ===
+    // === Define Character Pools ===
     const std::string uppercase(uppercase_chars);
     const std::string lowercase(lowercase_chars);
     const std::string digits(digit_chars);
@@ -913,7 +942,7 @@ inline std::string generate_password(
     if (require_digits)    all_chars += digits;
     if (require_symbols)   all_chars += symbols;
 
-    // === Step 6: Build Password with Guaranteed Diversity ===
+    // === Build Password with Guaranteed Diversity ===
     std::string password;
     password.reserve(password_length);  // Avoid reallocations
 
@@ -935,19 +964,13 @@ inline std::string generate_password(
         password += draw(all_chars, rng);
     }
 
-    // === Step 7: Fisher-Yates Shuffle for Uniformity ===
+    // === Fisher-Yates Shuffle for Uniformity ===
     // Shuffling ensures no bias from forced prefix positions
     for (size_t i = password_length - 1; i > 0; --i) {
         const size_t j = rng.unbiased(0, i);
         std::swap(password[i], password[j]);
     }
 
-    // === Step 8: Securely Erase Sensitive Data from Stack ===
-    // Overwrite all derived secrets to reduce memory exposure window
-    Utilities::secure_zero(key_material.data(), sizeof(key_material));
-    Utilities::secure_zero(rng_material.data(), sizeof(rng_material));
-    Utilities::secure_zero(rng_key.data(), sizeof(rng_key));
-    Utilities::secure_zero(rng_nonce.data(), sizeof(rng_nonce));
 
     return password;
 }
@@ -1111,8 +1134,10 @@ void generate_password_interactive()
         std::cin.get();
     }
 
-    // Zero sensitive memory before exit
+    // Final memory wipe before exit
     Utilities::secure_zero(master_password.data(), master_password.size());
+    master_password.clear();
+    master_password.shrink_to_fit(); 
 }
 
 
@@ -1349,20 +1374,20 @@ PasswordInputData parse_args(int argc, char const* argv[]) {
             }
             data.password_version = std::stoi(argv[++i]);
         }
-        else if (arg == "--no-uppercase"|| arg == "--nu") {
+        else if (arg == "--no-uppercase" || arg == "--nu") {
             data.require_uppercase = false;
         }
-        else if (arg == "--no-lowercase"|| arg == "--nl") {
+        else if (arg == "--no-lowercase" || arg == "--nl") {
             data.require_lowercase = false;
         }
-        else if (arg == "--no-digits"|| arg == "--nd") {
+        else if (arg == "--no-digits" || arg == "--nd") {
             data.require_digits = false;
         }
-        else if (arg == "--no-symbols"|| arg == "--ns") {
+        else if (arg == "--no-symbols" || arg == "--ns") {
             data.require_symbols = false;
         }
         else if (arg == "--uppercase" || arg == "--uc") {
-            if (i + 1 >= argc) { 
+            if (i + 1 >= argc) {
                 std::cerr << "Error: " << arg << " requires an argument: list of acceptable uppercase characters.\n";
                 std::exit(1);
             }
@@ -1441,7 +1466,7 @@ PasswordInputData parse_args(int argc, char const* argv[]) {
 
 int main(int argc, char const* argv[]) {
     PasswordInputData CL = parse_args(argc, argv);
-    if(CL.use_interactive_mode)
+    if (CL.use_interactive_mode)
         generate_password_interactive();
     else {
         try {
@@ -1480,11 +1505,14 @@ int main(int argc, char const* argv[]) {
             std::cerr << "Error: " << e.what() << '\n';
             std::cin.get();
         }
-        // Securely wipe master password from memory
-        Utilities::secure_zero(
-            const_cast<void*>(static_cast<const void*>(CL.master_password.data())),
-            CL.master_password.size()
-        );
+
+        // Clear master password from memory before exit
+        if (!CL.master_password.empty()) {
+            Utilities::secure_zero(CL.master_password.data(), CL.master_password.size());
+            // Also clear the string length to prevent reconstruction
+            CL.master_password.clear();
+            CL.master_password.shrink_to_fit();
+        }
     }
     return 0;
 }
