@@ -33,11 +33,46 @@
     alternative to cloud-based password managers (Google, LastPass, etc.). It gives
     you complete control: no storage, no transmission, no telemetry, no backdoors.
     
-## Installation
+## Building and Running
 
-    Open Visual Studio, create an empty console project.
-    Add all .cpp and .h files to the project.
-    Compile.
+### Windows (Fully Supported - Interactive UI)
+    
+    The included interactive text UI works out-of-the-box on Windows.
+    
+    1. Open Visual Studio (2022+ recommended, Community edition is free).
+    2. Create a new **Empty C++ Console Project**.
+    3. Add all `.h` files (and any `.cpp` if you add a main) to the project.
+    4. Build and run.
+
+Alternatively, use MinGW/Clang from command line:
+
+    g++ -std=c++20 -O2 *.cpp -o stonepass.exe
+    stonepass.exe
+
+### Linux / macOS (Core Functionality Only - No Interactive UI Yet)
+    
+    The password generation logic is fully portable, but the current interactive UI relies on Windows console functions.
+    You can still use StonePass as a library in your own code, or write a simple command-line wrapper.
+    Example minimal main.cpp (add this file yourself):
+
+        #include "StonePass.h"
+        #include <iostream>
+        
+        int main() {
+            try {
+                std::string pw = st::generate_password(
+                    "joe@example.com",
+                    "YourStrongMasterPassphraseHere",
+                    "github.com",
+                    20,
+                    1
+                );
+                std::cout << "Generated password: " << pw << std::endl;
+            } catch (const std::exception& e) {
+                std::cerr << "Error: " << e.what() << std::endl;
+            }
+            return 0;
+        }
     
 ## Customization
     Character sets can be easily customized by defining STONEPASS_UPPERCASE,
