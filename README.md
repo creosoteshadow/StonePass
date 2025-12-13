@@ -13,7 +13,7 @@
 
     - StoneKey - Memory-hard password hashing function.
     
-# Purpose and Intended Use
+## Purpose and Intended Use
     StonePass is a pure C++, header-only, fully offline deterministic password generator
     designed for individual users who want strong, reproducible passwords without storing
     any secrets, syncing to the cloud, or trusting third-party services.
@@ -28,19 +28,19 @@
     alternative to cloud-based password managers (Google, LastPass, etc.). It gives
     you complete control: no storage, no transmission, no telemetry, no backdoors.
 
-# Customization
+## Customization
     Character sets can be easily customized by defining STONEPASS_UPPERCASE,
     STONEPASS_LOWERCASE, STONEPASS_DIGITS, and/or STONEPASS_SYMBOLS before
     including this header. See the "Password Character Set Defaults" section
     near the top of this file for details and examples.
 
-# Target Audience
+## Target Audience
     • Individuals managing their own passwords
     • Privacy-focused users
     • Security enthusiasts wanting transparent, auditable tools
     • Anyone preferring offline, deterministic password generation
 
-# Not Intended For
+## Not Intended For
     • Organizations or applications requiring formal certification
       (e.g., FIPS 140, Common Criteria, NIST approval, NSA Suite B)
     • Regulated industries with compliance mandates
@@ -48,7 +48,7 @@
     • High-value institutional targets where nation-state attackers are a primary threat
     • Environments requiring third-party cryptographic module validation
 
-# Security Notes
+## Security Notes
     The cryptographic constructions (ChaCha20 core, custom sponge hash, memory-hard KDF)
     are conservative and based on well-studied primitives, but they are personal
     designs without independent third-party cryptanalysis or formal security proofs.
@@ -60,9 +60,9 @@
     For mission-critical or regulated applications, use standardized, widely vetted
     libraries (libsodium, OpenSSL, Bouncy Castle) and formally validated implementations.
 
-# License
+## License
     MIT License — free to use, modify, and distribute.
 
-# Disclaimer
+## Disclaimer
     Use at your own risk. The author provides no warranties. Test thoroughly in your
     environment. Always verify generated passwords meet site-specific requirements.
