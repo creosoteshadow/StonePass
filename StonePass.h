@@ -7,6 +7,7 @@
 #include <cstdint>
 #include <stdexcept>
 #include "StoneHash.h"
+#include "StoneKey.h"
 #include "StoneRNG.h"
 #include "ui.h"
 
