@@ -5,6 +5,8 @@
     No cloud. No storage. No back-doors. Based on a memorizable master password.
     Gives full control to the user.
 
+    All C++, primarily header files.
+    
 ## Also Included
 
     StonePass required several elements that could be used as a part of other
