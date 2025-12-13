@@ -32,7 +32,13 @@
     StonePass is intended for personal security-conscious users seeking a trustworthy
     alternative to cloud-based password managers (Google, LastPass, etc.). It gives
     you complete control: no storage, no transmission, no telemetry, no backdoors.
+    
+## Installation
 
+    Open Visual Studio, create an empty console project.
+    Add all .cpp and .h files to the project.
+    Compile.
+    
 ## Customization
     Character sets can be easily customized by defining STONEPASS_UPPERCASE,
     STONEPASS_LOWERCASE, STONEPASS_DIGITS, and/or STONEPASS_SYMBOLS before
