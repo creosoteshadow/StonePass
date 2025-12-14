@@ -52,9 +52,10 @@
     3. Add all `.h` files (and any `.cpp` if you add a main) to the project.
     4. Build and run.
 
-Alternatively, use MinGW/Clang etc. from command line:
+### Linux MinGW/Clang / macOS (Fully Portable Interactive UI)
 
-    The macro in StonePass.cpp should be like this:
+The interactive text-based UI is now fully portable and works on Linux and macOS without Windows-specific dependencies.
+The macro in StonePass.cpp should be like this:
     
         //#define USE_NONPORTABLE_WINDOWS_INTERFACE
         #include "StonePass.h"
@@ -63,7 +64,43 @@ Alternatively, use MinGW/Clang etc. from command line:
         	generate_password_interactive();
         	return EXIT_SUCCESS;
         }
+
+Compile with:
+
+        g++ -std=c++20 -O2 main.cpp -o stonepass
+        ./stonepass
+
+## Example Output
     
+    === StonePass - Offline Deterministic Password Generator ===
+    
+    Username / Email               : John_Doe@gmail.com
+    
+    Master Password                : John::Doe's::Master::Password
+    
+    Site / Domain                  : example.com
+    
+    Version (counter) [1-999999]   :  [1-999999]: 1
+    Length [8-64]                  :  [8-64]: 16
+    
+    Please wait -- generating password:
+    *** PASSWORD GENERATOR ***
+    Input data
+            Username = John_Doe@gmail.com
+            Master Password = John::Doe's::Master::Password
+            site_name = example.com
+            password length = 16
+            password version = 1
+    Generated Password
+            8@svX9.kYP2Zd3vE
+    
+    
+    Copy and use this password immediately. This program will not store this password.
+    Do not store it on a digital device. If you need this password again, simply run
+    this program again.
+    
+    Press <Enter> to clear the screen :
+
 ## Customization
     Character sets can be easily customized by defining STONEPASS_UPPERCASE,
     STONEPASS_LOWERCASE, STONEPASS_DIGITS, and/or STONEPASS_SYMBOLS before
