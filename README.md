@@ -6,6 +6,10 @@
     Gives full control to the user.
 
     All C++, primarily header files.
+
+    My goal it to make the world a better place, one password at a time.
+    
+    Reviews, analysis, testing, corrections and suggestions are welcome.
     
 ## Also Included
 
