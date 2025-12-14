@@ -6,10 +6,23 @@
 #include <string_view>
 #include <cstdint>
 #include <stdexcept>
+
 #include "StoneHash.h"
 #include "StoneKey.h"
 #include "StoneRNG.h"
-#include "ui.h"
+
+
+#ifdef USE_NONPORTABLE_WINDOWS_INTERFACE
+    // User explicitly requested Windows-specific version — allow only on MSVC
+    #if !defined(_MSC_VER)
+        #error "Windows-specific non-portable interface can only be used with MSVC"
+    #endif
+    #define USE_PORTABLE_INTERFACE 0
+    #include "ui.h"
+#else
+    // Default: portable everywhere
+    #define USE_PORTABLE_INTERFACE 1
+#endif
 
 
 /*
@@ -271,7 +284,19 @@ inline std::string generate_password(
     return password;
 }
 
+// By default, use the portable interface on all platforms.
+// 
+// To enable the Windows-specific non-portable interface (which uses windows.h, _getch, etc.),
+// define USE_NONPORTABLE_WINDOWS_INTERFACE before including this header, e.g.:
+//   - Via compiler flag: /DUSE_NONPORTABLE_WINDOWS_INTERFACE or -DUSE_NONPORTABLE_WINDOWS_INTERFACE
+//   - Or temporarily uncomment the line below for testing.
+//
+// This option is only available on Windows (MSVC).
 
+
+
+#if !USE_PORTABLE_INTERFACE
+// NON-PORTABLE interface. Requires windows.h
 inline void generate_password_interactive()
 {
     std::vector<ui::InputField> fields;
@@ -337,3 +362,104 @@ inline void generate_password_interactive()
         }
     }
 }// generate_password_interactive
+#else
+#include <string>
+#include <iostream>
+#include <limits>
+
+#include <algorithm>
+#include <cctype>
+
+// Helper to trim whitespace
+std::string trim(const std::string& str) {
+    auto start = std::find_if(str.begin(), str.end(), [](unsigned char c) { return !std::isspace(c); });
+    auto end = std::find_if(str.rbegin(), str.rend(), [](unsigned char c) { return !std::isspace(c); }).base();
+    return (start < end) ? std::string(start, end) : std::string();
+}
+
+std::string prompt_gets(const std::string& prompt) {
+    std::cout << prompt;
+    std::cout.flush();
+
+    std::string s;
+    std::getline(std::cin, s);
+    std::cout << std::endl;  // forces clean separation
+
+    return trim(s);
+}
+
+int prompt_geti(const std::string& prompt, int min_val, int max_val = INT_MAX)
+{
+    if (!prompt.empty()) {
+        std::cout << prompt;
+        if (max_val != INT_MAX)
+            std::cout << " [" << min_val << "-" << max_val << "]";
+        std::cout << ": ";
+        std::cout.flush();
+    }
+
+    int value;
+    while (true) {
+        if (std::cin >> value && value >= min_val && value <= max_val) {
+            std::cin.ignore(std::numeric_limits<std::streamsize>::max(), '\n');
+            return value;
+        }
+
+        std::cin.clear();
+        std::cin.ignore(std::numeric_limits<std::streamsize>::max(), '\n');
+        std::cout << "Please enter a number between " << min_val << " and " << max_val << ": ";
+        std::cout.flush();
+    }
+}
+
+// PORTABLE interface
+inline void generate_password_interactive() {
+    std::cout << "=== StonePass - Offline Deterministic Password Generator ===\n";
+    std::cout << "\n";
+    std::string username        = prompt_gets("Username / Email               : ");
+    std::string master_password = prompt_gets("Master Password                : ");
+    std::string site_name       = prompt_gets("Site / Domain                  : ");
+    int password_version        = prompt_geti("Version (counter) [1-999999]   : ", 1, 999999);
+    int password_length         = prompt_geti("Length [8-64]                  : ", 8, 64);
+    std::cout << "\n";
+    std::cout << "Please wait -- generating password: ";
+    std::cout << "\n";
+
+    std::string result = generate_password(
+        username,
+        master_password,
+        site_name,
+        password_length,
+        password_version = 1,
+        "ABCDEFGHJKLMNPQRSTUVWXYZ",  // no I,O
+        "abcdefghijkmnpqrstuvwxyz",  // no l,o
+        "23456789",                  // no 0,1
+        "@#$%&*()[]{};:,.?",         // widely accepted
+        true, // require uppercase
+        true, // require lowercase
+        true, // require digits
+        true  // require symbols
+    );
+
+    std::cout << "*** PASSWORD GENERATOR ***\n";
+    std::cout << "Input data\n";
+    std::cout << "\tUsername = " << username << "\n";
+    std::cout << "\tMaster Password = " << master_password << "\n";
+    std::cout << "\tsite_name = " << site_name << "\n";
+    std::cout << "\tpassword length = " << password_length << "\n";
+    std::cout << "\tpassword version = " << password_version << "\n";
+    std::cout << "Generated Password\n";
+    std::cout << "\t" << result << "\n";
+    std::cout << "\n\n";
+    std::cout << "Copy and use this password immediately. This program will not store this password.\n";
+    std::cout << "Do not store it on a digital device. If you need this password again, simply run\n";
+    std::cout << "this program again.\n";
+    std::cout << "\n";
+    std::cout << "";
+    
+    std::string dummy = prompt_gets("Press <Enter> to clear the screen : ");
+
+    for(int i=0;i<60;i++)
+        std::cout << "\n";
+}
+#endif
